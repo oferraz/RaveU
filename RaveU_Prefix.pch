@@ -1,0 +1,8 @@
+//
+// Prefix header for all source files of the 'BookHelp' target in the 'BookHelp' project
+//
+
+#ifdef __OBJC__
+    #import <Foundation/Foundation.h>
+    #import <UIKit/UIKit.h>
+#endif

@@ -1,0 +1,342 @@
+//
+//  SearchViewController.m
+//  BookHelp
+//
+//  Created by Ofer Raz on 9/20/10.
+//  Copyright 2010 GreenRoad Driving Technologies Ltd. All rights reserved.
+//
+
+#import "SearchViewController.h"
+#import "AboutViewController.h"
+#import "BooksTableViewController.h"
+#import "BookData.h"
+
+NSString *const GOODREADS_KEY = @"????";    // replace with your key
+
+
+@implementation SearchViewController
+
+- (id) init
+{
+	if (self = [super init]) {
+		
+		[[self navigationItem] setTitle:@"RaveU"];
+		
+		
+		//create and load the about button with "i" info icon		
+		UIButton *aboutButton = [UIButton buttonWithType:UIButtonTypeInfoLight];
+		[aboutButton addTarget:self action:@selector(loadAboutView:) forControlEvents:UIControlEventTouchUpInside];
+		[[self navigationItem] setRightBarButtonItem:[[[UIBarButtonItem alloc] initWithCustomView:aboutButton]autorelease]];
+	} 
+	return self;
+}
+
+- (void)didReceiveMemoryWarning {
+    // Releases the view if it doesn't have a superview.
+    [super didReceiveMemoryWarning];
+    
+    // Release any cached data, images, etc that aren't in use. 
+}
+
+- (void)viewDidUnload {
+    [super viewDidUnload];
+    // Release any retained subviews of the main view.
+    // e.g. self.myOutlet = nil;
+}
+
+
+- (void)dealloc {
+    [super dealloc];
+}
+
+#pragma mark -
+#pragma mark - button
+
+/**
+ * Search button on the keyboard was pressed
+ */
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    [self search];
+    return YES;
+}
+
+
+/**
+ * Search button was pressed
+ */
+- (IBAction)searchBook:(id)sender
+{
+	// close the keyboard
+	[ISBNField resignFirstResponder];
+	[self search];
+}
+
+
+/**
+ * Start the search
+ */
+- (void)search
+{
+	//test if the ISBNField is empty 
+	if ([[ISBNField text] length] == 0) {
+		NSString *errorString = @"Please enter a book name, author or ISBN!";
+		UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle:errorString 
+																 delegate:nil 
+														cancelButtonTitle:@"OK" 
+												   destructiveButtonTitle:nil 
+														otherButtonTitles:nil];
+		[actionSheet showInView:[[self view] window]];
+		[actionSheet autorelease];
+		return;
+	}
+	
+	// construct the web service URL
+	NSString *requestURL = [[[NSString alloc] initWithFormat:@"http://www.goodreads.com/search/search?format=xml&key=%@&q=%@",GOODREADS_KEY, [ISBNField text]] autorelease];
+	NSURL *url = [NSURL URLWithString:[requestURL stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]]; 
+	NSLog(@"%@",requestURL);
+	
+	// creating a request object with the URL
+	NSURLRequest *request = [NSURLRequest requestWithURL:url 
+											 cachePolicy:NSURLRequestReloadIgnoringCacheData 
+										 timeoutInterval:30];
+	// clear out existing connection
+	if (connectionInProgress) {
+		[connectionInProgress cancel];
+		[connectionInProgress release];
+	}
+	
+	// instantiate the object  to hold all the incoming XML
+	[xmlData release];
+	xmlData = [[NSMutableData alloc] init];
+	
+	//create and initiate a non-blocking connection
+	connectionInProgress = [[NSURLConnection alloc] initWithRequest:request 
+														   delegate:self 
+												   startImmediately:YES];
+}
+
+/**
+ * Info button was pressed
+ */
+- (void)loadAboutView:(id)sender
+{
+	//at this point we need to load the new view controll
+	if (!aboutViewController) {
+		aboutViewController = [[AboutViewController alloc] init];
+	}
+	
+	[[self navigationController] pushViewController:aboutViewController 
+										   animated:YES];
+	
+	
+}
+
+#pragma mark -
+#pragma mark - URL request
+
+/**
+ * Collect the request data
+ */
+- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
+{
+	[xmlData appendData:data];
+}
+
+
+/**
+ * We have all the data from the URL
+ */
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection
+{
+	// for debug - printing the xml to consule
+	//NSString *xmlTxt = [[NSString alloc] initWithData:xmlData encoding:NSUTF8StringEncoding]; 
+	//NSLog(@"*******************%@*******************\n", xmlTxt);
+	
+	// check if we have data to parse
+	if ([xmlData length] < 5) {
+		NSString *errorString = @"Book not found!";
+		UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle:errorString 
+																 delegate:nil 
+														cancelButtonTitle:@"OK" 
+												   destructiveButtonTitle:nil 
+														otherButtonTitles:nil];
+		[actionSheet showInView:[[self view] window]];
+		[actionSheet autorelease];
+		return;
+	}
+	
+	// create a parser
+	NSXMLParser *parser = [[NSXMLParser alloc] initWithData:xmlData];
+	[parser setDelegate:self];
+	
+	// get ready for parsing
+	if (!books) {
+		books = [[NSMutableArray alloc]init];
+	}
+	
+	NSLog(@"retain: %i", [books retainCount]);
+	
+	// set parsing flags
+	newBook = NO;
+	errorFlag = NO;
+	
+	// do the parsing
+	[parser parse];
+	
+	// the parser is done
+	[parser release];
+	
+	// check for error
+	if (errorFlag == YES) {
+		UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle:dataError 
+																 delegate:nil 
+														cancelButtonTitle:@"OK" 
+												   destructiveButtonTitle:nil 
+														otherButtonTitles:nil];
+		[actionSheet showInView:[[self view] window]];
+		[actionSheet autorelease];
+		return;
+	}
+	
+	// in case the returned XML was not including books
+	if ([books count] < 1) {
+		UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle:@"No books found" 
+																 delegate:nil 
+														cancelButtonTitle:@"OK" 
+												   destructiveButtonTitle:nil 
+														otherButtonTitles:nil];
+		[actionSheet showInView:[[self view] window]];
+		[actionSheet autorelease];
+		return;
+		
+	}
+	
+	//at this point we need to load the new view controll
+	if (!booksTableViewController) {
+		booksTableViewController = [[BooksTableViewController alloc] init];
+	}
+	
+	[booksTableViewController setBooks:books];
+	
+	[books release];
+	books = nil;
+	
+	[[self navigationController] pushViewController:booksTableViewController 
+										   animated:YES];
+	
+}
+
+/**
+ * URL connection error
+ */
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
+{
+	[connectionInProgress release];
+	connectionInProgress = nil;
+	
+	[xmlData release];
+	xmlData = nil;
+	
+	NSString *errorString = [NSString stringWithFormat:@"%@", [error localizedDescription]];
+	UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle:errorString 
+															 delegate:nil 
+													cancelButtonTitle:@"OK" 
+											   destructiveButtonTitle:nil 
+													otherButtonTitles:nil];
+	[actionSheet showInView:[[self view] window]];
+	[actionSheet autorelease];
+}
+
+#pragma mark -
+#pragma mark - XML Parsing
+
+/**
+ * Start parsing element start
+ */
+- (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName 
+  namespaceURI:(NSString *)namespaceURI 
+ qualifiedName:(NSString *)qualifiedName 
+	attributes:(NSDictionary *)attributeDict
+{
+	//NSLog(@"Tag: %@", elementName);
+	if ([elementName isEqual:@"error"]) {
+		xmlString = [[NSMutableString alloc] init];
+	} else if ([elementName isEqual:@"best_book"]) {
+		NSLog(@"found new book!");
+		if (!book) {
+			book = [[BookData alloc] init];
+		}
+		newBook = YES;
+		bookId = YES;
+	} else if ([elementName isEqual:@"id"] && newBook && bookId) {
+		xmlString = [[NSMutableString alloc] init];
+	} else if ([elementName isEqual:@"title"] && newBook) {
+		xmlString = [[NSMutableString alloc] init];
+	} else if ([elementName isEqual:@"name"] && newBook) {	// author name
+		xmlString = [[NSMutableString alloc] init];
+	} else if ([elementName isEqual:@"image_url"] && newBook) {
+		xmlString = [[NSMutableString alloc] init];
+	} else if ([elementName isEqual:@"small_image_url"] && newBook) {
+		xmlString = [[NSMutableString alloc] init];
+	}
+}
+
+/**
+ * Collecting the element text
+ */
+- (void)parser:(NSXMLParser *)parser foundCharacters:(NSString *)string
+{
+	[xmlString appendString:string];
+}
+
+
+/**
+ * Parsing element end
+ */
+- (void)parser:(NSXMLParser *)parser didEndElement:(NSString *)elementName 
+  namespaceURI:(NSString *)namespaceURI 
+ qualifiedName:(NSString *)qName
+{
+	if ([elementName isEqual:@"error"]) {
+		//NSLog(@"ended title: %@", xmlString);
+		errorFlag = YES;
+		dataError = [xmlString copy];
+		[xmlString release];
+		xmlString = nil;
+	} else if ([elementName isEqual:@"best_book"]) {
+		newBook = NO;
+		[books addObject:book];
+		[book release];
+		book = nil;
+	} else if ([elementName isEqual:@"id"] && newBook && bookId) {
+		[book setBookID:xmlString];
+		[xmlString release];
+		xmlString = nil;
+		bookId = NO;
+	} else if ([elementName isEqual:@"title"] && newBook) {
+		[book setBookTitle:xmlString];
+		[xmlString release];
+		xmlString = nil;
+	} else if ([elementName isEqual:@"name"] && newBook) {
+		[book setBookAuthor:xmlString];
+		[xmlString release];
+		xmlString = nil;
+	} else if ([elementName isEqual:@"image_url"] && newBook) {
+		[book setBookImageUrl:xmlString];
+		[xmlString release];
+		xmlString = nil;
+	} else if ([elementName isEqual:@"small_image_url"] && newBook) {
+		[book setBookSmallImageUrl:xmlString];
+		[xmlString release];
+		xmlString = nil;
+	}
+	
+}	
+
+
+
+
+
+
+@end

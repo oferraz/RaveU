@@ -1,0 +1,49 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\fonttbl\f0\fnil\fcharset0 Monaco;}
+{\colortbl;\red255\green255\blue255;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+
+\f0\fs20 \cf0 Version 1.0.1\
+\
+\
+1. handle no comm - done\
+2. Add rank images - done\
+3. Add app icon - done\
+4. Add about - done\
+5. Check if there is an ISBN in the text field - done\
+6. Replace the about image and add the image title - done\
+\
+\
+Bugs:\
+1. Add line brake between the book description and the reviews - done\
+2. add a space between the ranking and the number - done\
+3. remove (trim) leading and following spaces from the ISBN # - done\
+4. Bad ISBN couse it to crush - done\
+\
+\
+\
+\
+Version 2.0.1\
+\
+Features:\
+1. Add ranks images to reviews - done\
+2. Improve search button grphics - done\
+\
+Bugs:\
+1. Fix review HTML tags presentation - Goodreads bug\
+2. Connect the search button on the keyboard - done\
+3. Change "enter ISBN" error message to "Enter book name authore or ISBN" - done\
+4. Add error message when data is returning but no books found - done\
+\
+\
+Find books by title, author, or ISBN\
+Get an xml file with the most popular books for the given query. This will search all books in the title/author/ISBN fields and show matches, sorted by popularity on Goodreads. \
+url: http://www.goodreads.com/search/search.xml \'a0\'a0(sample url) \
+http method: GET \
+params:\
+	\'95	search[field]: Field to search, one of title, author, or genre (default is all)\
+	\'95	key: Developer key (required).\
+	\'95	page: Which page to return (default 1, optional)\
+	\'95	q: The query text to match against book title, author, and ISBN fields. Supports boolean operators and phrase searching.\
+	\'95	\
+	\'95	http://www.goodreads.com/search/search?format=xml&key=lyKToXkewiHlJCUxKvqRA&q=Ender%27s+Game}
